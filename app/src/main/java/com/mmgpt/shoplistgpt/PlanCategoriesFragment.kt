@@ -79,19 +79,36 @@ class PlanCategoriesFragment : Fragment() {
         dragHelper.attachToRecyclerView(binding.recyclerView)
 
         val gestureDetector = GestureDetectorCompat(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDoubleTap(e: MotionEvent): Boolean {
+            private var firstTapPosition = RecyclerView.NO_POSITION
+
+            private fun positionAt(e: MotionEvent): Int {
                 val child = binding.recyclerView.findChildViewUnder(e.x, e.y)
-                val position = child?.let { binding.recyclerView.getChildAdapterPosition(it) } ?: RecyclerView.NO_POSITION
-                if (position != RecyclerView.NO_POSITION) {
+                return child?.let { binding.recyclerView.getChildAdapterPosition(it) } ?: RecyclerView.NO_POSITION
+            }
+
+            // onDoubleTap receives the FIRST tap's down event, and two taps up to
+            // ~100dp apart (i.e. on adjacent rows) still count as a double-tap.
+            // Remember the first tap's row here and only navigate in
+            // onDoubleTapEvent if the second tap lands on the same row.
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                firstTapPosition = positionAt(e)
+                return true
+            }
+
+            override fun onDoubleTapEvent(e: MotionEvent): Boolean {
+                if (e.actionMasked != MotionEvent.ACTION_DOWN) return false
+                val position = positionAt(e)
+                if (position != RecyclerView.NO_POSITION && position == firstTapPosition) {
                     val item = adapter.currentList.getOrNull(position)
                     if (item?.isHeading == true) {
-                        val index = position - 1
+                        // Row 0 is the "Add..." placeholder, so row N is category
+                        // N - 1, which lives on pager page N (page 0 is this list).
                         val viewPager = requireActivity().findViewById<ViewPager2>(R.id.viewPager)
-                        viewPager.currentItem = index + 1
+                        viewPager.currentItem = position
                         return true
                     }
                 }
-                return super.onDoubleTap(e)
+                return false
             }
         })
 
